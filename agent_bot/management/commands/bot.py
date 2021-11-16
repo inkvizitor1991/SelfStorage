@@ -19,7 +19,7 @@ logging.basicConfig(
     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-STORAGE = range(1)
+STORAGE, THINGS = range(2)
 
 TG_TOKEN = settings.BOT_TOKEN
 
@@ -31,15 +31,34 @@ keyboard_adress = [
     ['ул. Крыленко, 3Б ( м. Улица Дыбенко )'],
     ['Мурино, Воронцовский б-р, 3 ( м. Девяткино )'],
 ]
+keyboard_things = [['сезонные вещи'],['другое']]
+
+
+# (599 руб - 1 кв.м., далее +150 руб за каждый кв. метр в месяц)
+sq_m = [['599 руб - 1 кв.м'],]
+
 keyboard_first = ReplyKeyboardMarkup(
     keyboard_adress,
     resize_keyboard=True,
     one_time_keyboard=True
 )
 
+keyboard_second = ReplyKeyboardMarkup(
+    keyboard_things,
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
+keyboard_third = ReplyKeyboardMarkup(
+    sq_m,
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
+
+
+
 
 def start(update, context):
-    time.sleep(1)
+    time.sleep(0.5)
     user = update.message.from_user
     text = f'Привет {user.first_name}! \nSelfStorage, аренда складов в г.Санкт-Петербург.'
     update.message.reply_text(text)
@@ -56,6 +75,7 @@ def start(update, context):
     time.sleep(1)
     reply_text = 'Выберите склад, для хранения вещей.'
     update.message.reply_text(reply_text, reply_markup=keyboard_first)
+    time.sleep(0.2)
     return STORAGE
     # profile, _ = Profile.objects.get_or_create( ### сохраняет в бд, она нужна в конце кода
     #    external_id=chat_id,
@@ -74,8 +94,27 @@ def start(update, context):
 
 def get_storage(update, context):
     user_message = update.message.text
+    context.user_data['storage'] = user_message
     if user_message == 'Санкт-Петербург, Пироговская набережная 15 (м.Площадь Ленина)':
         print('ОКЕЙ')
+    reply_text = 'Что хотите хранить?'
+    update.message.reply_text(reply_text, reply_markup=keyboard_second)
+    time.sleep(0.2)
+    return THINGS
+
+
+def get_things(update, context):
+
+    user_message = update.message.text
+    print(user_message)
+    if user_message =='другое':
+        reply_text = 'Выберете габаритность ячейки.'
+        update.message.reply_text(reply_text, reply_markup=keyboard_third)
+    else:
+        reply_text = 'В разработке.'
+        update.message.reply_text(reply_text)
+        print('тут пока стоп')
+
 
 
 def cancel(update, _):
@@ -98,7 +137,8 @@ class Command(BaseCommand):
             states={
                 STORAGE: [CommandHandler('start', start),
                           MessageHandler(Filters.text, get_storage)],
-
+                THINGS: [CommandHandler('start', start),
+                          MessageHandler(Filters.text, get_things)],
             },
 
             fallbacks=[CommandHandler('cancel', cancel)]
