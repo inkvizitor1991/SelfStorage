@@ -2,33 +2,17 @@ import logging
 import time
 import telegram
 
-
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from telegram import (
-    Bot,
-    KeyboardButton,
-    ReplyKeyboardMarkup,
-    ReplyKeyboardRemove,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton,
-)
+
+from telegram import ReplyKeyboardMarkup
 from telegram.ext import (
-    CallbackContext,
     Updater,
-    Filters,
-    MessageHandler,
     CommandHandler,
-    ConversationHandler,
-    CallbackQueryHandler
+    MessageHandler,
+    Filters,
+    ConversationHandler
 )
-from agent_bot.models import Order, Profile
-
-from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton)
-from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
-                          ConversationHandler)
-
-
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -41,13 +25,11 @@ TG_TOKEN = settings.BOT_TOKEN
 
 bot = telegram.Bot(token=TG_TOKEN)
 
-
-
-keyboard_adress =[
-    ['Санкт-Петербург, Пироговская набережная 15 (м.Площадь Ленина)'],
-    ['Санкт-Петербург, Московское шоссе, 25, корп. 1В (м.Звездная)'],
-    ['Санкт-Петербург, ул. Крыленко, 3Б ( м. Улица Дыбенко )'],
-    ['Санкт-Петербург, Мурино, Воронцовский б-р, 3 ( м. Девяткино )'],
+keyboard_adress = [
+    ['Пироговская набережная 15 (м.Площадь Ленина)'],
+    ['Московское шоссе, 25, корп. 1В (м.Звездная)'],
+    ['ул. Крыленко, 3Б ( м. Улица Дыбенко )'],
+    ['Мурино, Воронцовский б-р, 3 ( м. Девяткино )'],
 ]
 keyboard_first = ReplyKeyboardMarkup(
     keyboard_adress,
@@ -75,24 +57,25 @@ def start(update, context):
     reply_text = 'Выберите склад, для хранения вещей.'
     update.message.reply_text(reply_text, reply_markup=keyboard_first)
     return STORAGE
-    #profile, _ = Profile.objects.get_or_create( ### сохраняет в бд, она нужна в конце кода
+    # profile, _ = Profile.objects.get_or_create( ### сохраняет в бд, она нужна в конце кода
     #    external_id=chat_id,
     #    defaults={
     #        'name': username,
     #        'first_name': first_name,
     #        'last_name': last_name,
     #    }
-    #)#
+    # )#
+
+
 #
-    #Order(
-    #    profile=profile,
-    #).save()
+# Order(
+#    profile=profile,
+# ).save()
 
 def get_storage(update, context):
     user_message = update.message.text
     if user_message == 'Санкт-Петербург, Пироговская набережная 15 (м.Площадь Ленина)':
         print('ОКЕЙ')
-
 
 
 def cancel(update, _):
@@ -115,7 +98,6 @@ class Command(BaseCommand):
             states={
                 STORAGE: [CommandHandler('start', start),
                           MessageHandler(Filters.text, get_storage)],
-
 
             },
 
