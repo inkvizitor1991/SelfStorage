@@ -19,42 +19,69 @@ logging.basicConfig(
     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-STORAGE, THINGS = range(2)
+STORAGE, CATEGORY, THINGS, QUANTITY, PERIOD, CHECK_PERIOD, INITIALS = range(7)
 
 TG_TOKEN = settings.BOT_TOKEN
 
 bot = telegram.Bot(token=TG_TOKEN)
 
-keyboard_adress = [
+address_kb = [
     ['Пироговская набережная 15 (м.Площадь Ленина)'],
     ['Московское шоссе, 25, корп. 1В (м.Звездная)'],
     ['ул. Крыленко, 3Б ( м. Улица Дыбенко )'],
     ['Мурино, Воронцовский б-р, 3 ( м. Девяткино )'],
 ]
-keyboard_things = [['сезонные вещи'],['другое']]
+choosing_category_kb = [['сезонные вещи', 'другое']]
 
-
-# (599 руб - 1 кв.м., далее +150 руб за каждый кв. метр в месяц)
-sq_m = [['599 руб - 1 кв.м'],]
-
-keyboard_first = ReplyKeyboardMarkup(
-    keyboard_adress,
+seasonal_things_kb = [
+    ['лыжи', 'сноуборд'],
+    ['велосипед', 'колеса']
+]
+storage_period_kb = [
+    ['неделя', 'месяц', 'пол года'],
+    ['больше месяца но меньше пол года']
+]
+more_storage_period_kb = [
+    ['2 месяца', '3 месяца'],
+    ['4 месяца', '5 месяцев'],
+    ['назад']
+]
+tires_storage_period_kb = [
+    ['месяц', 'пол года'],
+    ['больше месяца но меньше пол года']
+]
+address = ReplyKeyboardMarkup(
+    address_kb,
     resize_keyboard=True,
     one_time_keyboard=True
 )
 
-keyboard_second = ReplyKeyboardMarkup(
-    keyboard_things,
+choosing_category = ReplyKeyboardMarkup(
+    choosing_category_kb,
     resize_keyboard=True,
     one_time_keyboard=True
 )
-keyboard_third = ReplyKeyboardMarkup(
-    sq_m,
+seasonal_things = ReplyKeyboardMarkup(
+    seasonal_things_kb,
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
+storage_period = ReplyKeyboardMarkup(
+    storage_period_kb,
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
+more_storage_period = ReplyKeyboardMarkup(
+    more_storage_period_kb,
     resize_keyboard=True,
     one_time_keyboard=True
 )
 
-
+tires_storage_period = ReplyKeyboardMarkup(
+    tires_storage_period_kb,
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
 
 
 def start(update, context):
@@ -74,7 +101,7 @@ def start(update, context):
     username = context.user_data.get('username')
     time.sleep(1)
     reply_text = 'Выберите склад, для хранения вещей.'
-    update.message.reply_text(reply_text, reply_markup=keyboard_first)
+    update.message.reply_text(reply_text, reply_markup=address)
     time.sleep(0.2)
     return STORAGE
     # profile, _ = Profile.objects.get_or_create( ### сохраняет в бд, она нужна в конце кода
@@ -95,26 +122,99 @@ def start(update, context):
 def get_storage(update, context):
     user_message = update.message.text
     context.user_data['storage'] = user_message
-    if user_message == 'Санкт-Петербург, Пироговская набережная 15 (м.Площадь Ленина)':
-        print('ОКЕЙ')
+    if user_message == 'Пироговская набережная 15 (м.Площадь Ленина)':
+        print(user_message)
     reply_text = 'Что хотите хранить?'
-    update.message.reply_text(reply_text, reply_markup=keyboard_second)
+    update.message.reply_text(reply_text, reply_markup=choosing_category)
     time.sleep(0.2)
-    return THINGS
+    return CATEGORY
+
+
+def choose_category(update, context):
+    user_message = update.message.text
+    print(user_message)
+    if user_message == 'другое':
+        print('ок')
+    if user_message == 'сезонные вещи':
+        reply_text = 'Выберете вещи.'
+        update.message.reply_text(reply_text, reply_markup=seasonal_things)
+        return THINGS
 
 
 def get_things(update, context):
+    user_message = update.message.text
+    context.user_data['things'] = user_message
+    if user_message:
+        update.message.reply_text('Укажите кол-во.')
+        return QUANTITY
 
+
+def get_quantity(update, context):
     user_message = update.message.text
     print(user_message)
-    if user_message =='другое':
-        reply_text = 'Выберете габаритность ячейки.'
-        update.message.reply_text(reply_text, reply_markup=keyboard_third)
-    else:
-        reply_text = 'В разработке.'
-        update.message.reply_text(reply_text)
-        print('тут пока стоп')
+    if user_message.isdigit() and int(user_message) < 100:
+        context.user_data['quantity'] = user_message
+        update.message.reply_text('Стоимость: 10000 за месяц')
+        print('Тут пользователю отправляется стоимость хранения вещи.')
+        time.sleep(0.3)
+        things = context.user_data.get('things')
+        if things in ('лыжи', 'сноуборд', 'велосипед'):
+            reply_text = 'Выберете срок хранения.'
+            update.message.reply_text(reply_text, reply_markup=storage_period)
+            return PERIOD
+        if things == 'колеса':
+            reply_text = 'Выберете срок хранения.'
+            update.message.reply_text(
+                reply_text,
+                reply_markup=tires_storage_period
+            )
+            return PERIOD
 
+    else:
+        update.message.reply_text('Проверьте правильность ввода.')
+
+
+def get_storage_period(update, context):
+    user_message = update.message.text
+    print(user_message)
+    if user_message == 'больше месяца но меньше пол года':
+        update.message.reply_text('Принято.', reply_markup=more_storage_period)
+        return CHECK_PERIOD
+    else:
+        context.user_data['storage_period'] = user_message
+        print(user_message)
+        update.message.reply_text('Принято.')
+        update.message.reply_text('Напишите ФИО.')
+        return INITIALS
+
+
+def check_storage_period(update, context):
+    user_message = update.message.text
+    things = context.user_data.get('things')
+    if things in ('лыжи', 'сноуборд', 'велосипед') and user_message == 'назад':
+        reply_text = 'Выберете срок хранения.'
+        update.message.reply_text(reply_text, reply_markup=storage_period)
+        return PERIOD
+    if things == 'колеса' and user_message == 'назад':
+        reply_text = 'Выберете срок хранения.'
+        update.message.reply_text(
+            reply_text,
+            reply_markup=tires_storage_period
+        )
+        return PERIOD
+    else:
+        context.user_data['storage_period'] = user_message
+        print(user_message)
+        update.message.reply_text('Принято.')
+        update.message.reply_text('Напишите ФИО.')
+        return INITIALS
+
+
+def get_initials(update, context):
+    user_message = update.message.text
+    print(user_message)
+    print('we here')
+    update.message.reply_text('Хорошо!Теперь укажите кредитную карту!')
 
 
 def cancel(update, _):
@@ -137,8 +237,25 @@ class Command(BaseCommand):
             states={
                 STORAGE: [CommandHandler('start', start),
                           MessageHandler(Filters.text, get_storage)],
+
+                CATEGORY: [CommandHandler('start', start),
+                           MessageHandler(Filters.text, choose_category)],
+
                 THINGS: [CommandHandler('start', start),
-                          MessageHandler(Filters.text, get_things)],
+                         MessageHandler(Filters.text, get_things)],
+
+                QUANTITY: [CommandHandler('start', start),
+                           MessageHandler(Filters.text, get_quantity)],
+
+                PERIOD: [CommandHandler('start', start),
+                         MessageHandler(Filters.text, get_storage_period)],
+
+                CHECK_PERIOD: [CommandHandler('start', start),
+                               MessageHandler(Filters.text,
+                                              check_storage_period)],
+
+                INITIALS: [CommandHandler('start', start),
+                           MessageHandler(Filters.text, get_initials)],
             },
 
             fallbacks=[CommandHandler('cancel', cancel)]
