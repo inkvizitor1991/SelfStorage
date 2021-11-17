@@ -3,3 +3,4 @@ phonenumbers==8.12.37
 python-dotenv==0.19.2
 python_telegram_bot==13.8.1
 telegram==0.0.1
+Pillow==8.4.0
