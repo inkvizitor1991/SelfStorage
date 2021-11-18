@@ -21,6 +21,8 @@ class Profile(models.Model):
         blank=True,
         max_length=10
     )
+    tg_chat_id = models.CharField(verbose_name='Chat ID Покупателя', null=True, blank=True,
+                                        max_length=256)
     phone = models.CharField(
         'Телефон пользователя',
         blank=True,
@@ -32,7 +34,6 @@ class Profile(models.Model):
         default=0
     )
     birthdate = models.DateField(verbose_name='Дата рождения', null=True, blank=True)
-    GDPR_status = models.BooleanField(null=True, default=False)
     home_address = models.CharField('Домашний адрес',
                                     max_length=50, blank=True, default='')
 
@@ -44,23 +45,24 @@ class Profile(models.Model):
         verbose_name_plural = 'Профили'
 
 
-class Stuff(models.Model):
-    stuff_name = models.CharField(max_length=256)
+class Stuff_categories(models.Model):
+    categories_name = models.CharField(max_length=256)
     def __str__(self):
-        return f'{self.stuff_name}'
+        return f'{self.categories_name}'
 
     class Meta:
-        verbose_name = 'Вещь'
-        verbose_name_plural = 'Вещи'
+        verbose_name = 'Категория вещей'
+        verbose_name_plural = 'Категорий вещей'
 
 
-class Stuff_properties(models.Model):
-    stuff = models.ForeignKey(Stuff, on_delete=models.CASCADE)
-    price_per_week = models.PositiveIntegerField(verbose_name='Цена за неделю')
-    price_per_month = models.PositiveIntegerField(verbose_name='Цена за месяц')
+class Stuff(models.Model):
+    stuff_categories = models.ForeignKey(Stuff_categories, on_delete=models.CASCADE, default = None)
+    stuff_name = models.CharField(verbose_name='Назвние вещи',max_length=256)
+    price_per_week = models.PositiveIntegerField(verbose_name='Цена за неделю', default = 100)
+    price_per_month = models.PositiveIntegerField(verbose_name='Цена за месяц', default = 100)
 
     def __str__(self):
-        return f'{self.Stuff_properties}'
+        return f'{self.stuff_name}'
 
     class Meta:
         verbose_name = 'Свойства вещи'
@@ -116,3 +118,10 @@ class OrderDetails(models.Model):
                                     )
     qr_code = models.ImageField(upload_to='static/qr', height_field=None, width_field=None, max_length=100)
 
+
+class Promo_code():
+    month = models.CharField(verbose_name='Месяц действия промокода', null=True, blank=True,
+                                       max_length=256)
+    promo_code = models.CharField(verbose_name='Промокод', null=True, blank=True,
+                                       max_length=256)
+    percent_discount = models.IntegerField(verbose_name='Процент скидки', null=True, blank=True)
