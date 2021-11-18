@@ -1,7 +1,9 @@
 import logging
 import time
 import telegram
+import qrcode
 
+from collections import defaultdict
 from django.core.management.base import BaseCommand
 from django.conf import settings
 
@@ -19,7 +21,12 @@ logging.basicConfig(
     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-STORAGE, CATEGORY, THINGS, QUANTITY, PERIOD, CHECK_PERIOD, INITIALS = range(7)
+STORAGE, CATEGORY, THINGS, QUANTITY, PERIOD, CHECK_PERIOD, INITIALS, PASPORT, BIRTH, ORDER, CHECKOUT = range(
+    11)
+
+storage_info = defaultdict()
+
+CHECKOUT_URL = 'https://www.tinkoff.ru/kassa/solution/qr/'
 
 TG_TOKEN = settings.BOT_TOKEN
 
@@ -50,6 +57,8 @@ tires_storage_period_kb = [
     ['месяц', 'пол года'],
     ['больше месяца но меньше пол года']
 ]
+byu_or_menu_kb = [['Оплатить', 'Главное меню']]
+
 address = ReplyKeyboardMarkup(
     address_kb,
     resize_keyboard=True,
@@ -83,81 +92,98 @@ tires_storage_period = ReplyKeyboardMarkup(
     one_time_keyboard=True
 )
 
+byu_or_menu = ReplyKeyboardMarkup(
+    byu_or_menu_kb,
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
+
+
+def get_user_data_from_db():
+    return False
+
+
+def is_valid_fio(fio):
+    return True
+
+
+def is_valid_phone(phone):
+    return True
+
+
+def is_valid_passport(passport):
+    return True
+
+
+def is_valid_birth_date(birth_date):
+    return True
+
+
+def get_qr_code(chat_id):
+    img = qrcode.make(chat_id)
+    img.save(f'{chat_id}.png')
+    return f'{chat_id}.png'
+
 
 def start(update, context):
     time.sleep(0.5)
-    user = update.message.from_user
-    text = f'Привет {user.first_name}! \nSelfStorage, аренда складов в г.Санкт-Петербург.'
+    message = update.message
+    user_name = message.chat.first_name
+    text = f'Привет, {user_name}.🤚\n\n' \
+           'Я помогу вам арендовать личную ячейку для хранения вещей.' \
+           'Давайте посмотрим адреса складов, чтобы выбрать ближайший!'
     update.message.reply_text(text)
-    chat_id = update.message.chat_id
-    context.user_data['user_id'] = update.message.chat_id
-    context.user_data['first_name'] = update.message.from_user.first_name
-    context.user_data['last_name'] = update.message.from_user.last_name
-    context.user_data['username'] = update.message.from_user.username
-
-    chat_id = update.message.chat_id
-    first_name = context.user_data.get('first_name')
-    last_name = context.user_data.get('last_name')
-    username = context.user_data.get('username')
     time.sleep(1)
     reply_text = 'Выберите склад, для хранения вещей.'
     update.message.reply_text(reply_text, reply_markup=address)
     time.sleep(0.2)
     return STORAGE
-    # profile, _ = Profile.objects.get_or_create( ### сохраняет в бд, она нужна в конце кода
-    #    external_id=chat_id,
-    #    defaults={
-    #        'name': username,
-    #        'first_name': first_name,
-    #        'last_name': last_name,
-    #    }
-    # )#
 
-
-#
-# Order(
-#    profile=profile,
-# ).save()
 
 def get_storage(update, context):
-    user_message = update.message.text
-    context.user_data['storage'] = user_message
-    if user_message == 'Пироговская набережная 15 (м.Площадь Ленина)':
-        print(user_message)
+    message = update.message
+    user_id = message.chat_id
+    storage_info[user_id] = {}
+    address = message.text
+    storage_info[user_id]['address'] = address
     reply_text = 'Что хотите хранить?'
     update.message.reply_text(reply_text, reply_markup=choosing_category)
-    time.sleep(0.2)
     return CATEGORY
 
 
 def choose_category(update, context):
-    user_message = update.message.text
-    print(user_message)
-    if user_message == 'другое':
+    message = update.message
+    user_id = message.chat_id
+
+    storage_type = message.text
+    storage_info[user_id]['storage_type'] = storage_type
+    if storage_type == 'другое':
         print('ок')
-    if user_message == 'сезонные вещи':
+    if storage_type == 'сезонные вещи':
         reply_text = 'Выберете вещи.'
         update.message.reply_text(reply_text, reply_markup=seasonal_things)
         return THINGS
 
 
 def get_things(update, context):
-    user_message = update.message.text
-    context.user_data['things'] = user_message
-    if user_message:
-        update.message.reply_text('Укажите кол-во.')
-        return QUANTITY
+    message = update.message
+    user_id = message.chat_id
+    things = message.text
+    storage_info[user_id]['things'] = things
+    update.message.reply_text('Укажите кол-во.')
+    return QUANTITY
 
 
 def get_quantity(update, context):
-    user_message = update.message.text
-    print(user_message)
-    if user_message.isdigit() and int(user_message) < 100:
-        context.user_data['quantity'] = user_message
+    message = update.message
+    user_id = message.chat_id
+    cell_size = message.text
+    if cell_size.isdigit() and int(cell_size) < 100:
+        context.user_data['quantity'] = cell_size
         update.message.reply_text('Стоимость: 10000 за месяц')
-        print('Тут пользователю отправляется стоимость хранения вещи.')
+        storage_info[user_id]['cell_size'] = cell_size
         time.sleep(0.3)
-        things = context.user_data.get('things')
+        things = storage_info[user_id].get('things')
         if things in ('лыжи', 'сноуборд', 'велосипед'):
             reply_text = 'Выберете срок хранения.'
             update.message.reply_text(reply_text, reply_markup=storage_period)
@@ -175,22 +201,30 @@ def get_quantity(update, context):
 
 
 def get_storage_period(update, context):
-    user_message = update.message.text
-    print(user_message)
-    if user_message == 'больше месяца но меньше пол года':
+    message = update.message
+    user_id = message.chat_id
+
+    storage_period = message.text
+    if storage_period == 'больше месяца но меньше пол года':
         update.message.reply_text('Принято.', reply_markup=more_storage_period)
         return CHECK_PERIOD
     else:
-        context.user_data['storage_period'] = user_message
-        print(user_message)
-        update.message.reply_text('Принято.')
-        update.message.reply_text('Напишите ФИО.')
-        return INITIALS
+        storage_info[user_id]['storage_period'] = storage_period
+        user_info = get_user_data_from_db()
+        ####Если есть пользователь в бд сразу на оплату
+        if not user_info:
+            update.message.reply_text(
+                'Пожалуйста, введите ваше ФИО, например - Иванов Иван Иванович',
+            )
+            return INITIALS
 
 
 def check_storage_period(update, context):
-    user_message = update.message.text
-    things = context.user_data.get('things')
+    message = update.message
+    user_id = message.chat_id
+    user_message = message.text
+    things = storage_info[user_id].get('things')
+
     if things in ('лыжи', 'сноуборд', 'велосипед') and user_message == 'назад':
         reply_text = 'Выберете срок хранения.'
         update.message.reply_text(reply_text, reply_markup=storage_period)
@@ -203,18 +237,106 @@ def check_storage_period(update, context):
         )
         return PERIOD
     else:
-        context.user_data['storage_period'] = user_message
-        print(user_message)
-        update.message.reply_text('Принято.')
-        update.message.reply_text('Напишите ФИО.')
-        return INITIALS
+        storage_info[user_id]['storage_period'] = user_message
+        user_info = get_user_data_from_db()
+        ####Если есть сразу на оплату
+        if not user_info:
+            update.message.reply_text(
+                'Пожалуйста, введите ваше ФИО, например - Иванов Иван Иванович',
+            )
+            return INITIALS
+        return ORDER
 
 
 def get_initials(update, context):
     user_message = update.message.text
-    print(user_message)
-    print('we here')
-    update.message.reply_text('Хорошо!Теперь укажите кредитную карту!')
+    message = update.message
+    fio = message.text
+    if is_valid_fio(user_message):
+        update.message.reply_text(
+            'Пожалуйста, введите ваш номер телефона в формате: 79260000000'
+        )
+        storage_info[message.chat_id]['fio'] = fio
+        return PASPORT
+    else:
+        update.message.reply_text(
+            'ФИО введено некорректно! Введите ФИО еще раз, например - Иванов Иван Иванович',
+        )
+
+
+def get_user_passport_from_bot(update, context):
+    message = update.message
+    phone = message.text
+    if is_valid_phone(phone):
+        update.message.reply_text(
+            'Пожалуйста, введите ваши пасспортные данные в формаете СЕРИЯ НОМЕР\n'
+            'Например: 8805 777666',
+        )
+        storage_info[message.chat_id]['phone'] = phone
+        return BIRTH
+    else:
+        update.message.reply_text(
+            'Номер введен некорректно! Введите в формате: 79260000000 ',
+        )
+
+
+def get_user_birth_date_from_bot(update, context):
+    message = update.message
+    passport = message.text
+    if is_valid_passport(passport):
+        update.message.reply_text(
+            'Пожалуйста, введите вашу дату рождения в формете ГОД-МЕСЯЦ-ЧИСЛО\n'
+        )
+        storage_info[message.chat_id]['passport'] = passport
+        return ORDER
+    else:
+        update.message.reply_text(
+            'Паспортные данные введены некорректно, нужный формат - СЕРИЯ НОМЕР',
+        )
+
+
+def create_order(update, context):
+    message = update.message
+    birth_date = message.text
+    user_id = message.chat_id
+    storage_type = storage_info[user_id]['storage_type']
+    address = storage_info[user_id]['address']
+    things = storage_info[user_id]['things']
+    period = storage_info[user_id]['storage_period']
+    fio = storage_info[message.chat_id]['fio']
+    passport = storage_info[message.chat_id]['passport']
+    phone = storage_info[message.chat_id]['phone']
+    if is_valid_birth_date(birth_date):
+        update.message.reply_text(
+            f'Отлично! Мы получили от вас следующие данные:\nФИО: {fio}\nПаспортные данные: {passport},\nТелефон: {phone},\nАдрес хранения: {address},\nТип хранения: {storage_type},\nВещь: {things},\nПериод хранения: {period}',
+            reply_markup=byu_or_menu
+        )
+        return CHECKOUT
+    else:
+        update.message.reply_text(
+            'Дата рождения введена некорректно, нужный формат - ГОД-МЕСЯЦ-ЧИСЛО\n'
+            'Например: 1991-08-17',
+        )
+
+
+def checkout(update, context):
+    message = update.message
+    choice = message.text
+    if choice == 'Оплатить':
+        update.message.reply_text(
+            f'Ссылка на оплату {CHECKOUT_URL}'
+        )
+        qr_code_path = get_qr_code(message.chat_id)
+        time.sleep(2)
+        with open(qr_code_path, 'rb') as qr:
+            context.bot.send_photo(
+                chat_id=message.chat_id,
+                photo=qr,
+            )
+        time.sleep(2)
+        return start(update, context)
+    else:
+        return start(update, context)
 
 
 def cancel(update, _):
@@ -256,6 +378,23 @@ class Command(BaseCommand):
 
                 INITIALS: [CommandHandler('start', start),
                            MessageHandler(Filters.text, get_initials)],
+
+                PASPORT: [CommandHandler('start', start),
+                          MessageHandler(Filters.text,
+                                         get_user_passport_from_bot)],
+
+                BIRTH: [CommandHandler('start', start),
+                        MessageHandler(Filters.text,
+                                       get_user_birth_date_from_bot)],
+
+                ORDER: [CommandHandler('start', start),
+                        MessageHandler(Filters.text,
+                                       create_order)],
+
+                CHECKOUT: [CommandHandler('start', start),
+                           MessageHandler(Filters.text,
+                                          checkout)],
+
             },
 
             fallbacks=[CommandHandler('cancel', cancel)]
