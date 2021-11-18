@@ -24,8 +24,8 @@ logging.basicConfig(
     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-STORAGE, CATEGORY, THINGS, QUANTITY, PERIOD, CHECK_PERIOD, INITIALS, PASPORT, BIRTH, ORDER, CHECKOUT = range(
-    11)
+STORAGE, CATEGORY, THINGS, QUANTITY, PERIOD, CHECK_PERIOD, RESERVE, INITIALS, PASPORT, BIRTH, ORDER, CHECKOUT = range(
+    12)
 
 storage_info = defaultdict()
 
@@ -61,6 +61,8 @@ tires_storage_period_kb = [
     ['больше месяца но меньше пол года']
 ]
 byu_or_menu_kb = [['Оплатить', 'Главное меню']]
+
+reserve_kb = [['Зарезервировать', 'Главное меню']]
 
 address = ReplyKeyboardMarkup(
     address_kb,
@@ -100,6 +102,11 @@ byu_or_menu = ReplyKeyboardMarkup(
     resize_keyboard=True,
     one_time_keyboard=True
 )
+reserve = ReplyKeyboardMarkup(
+    reserve_kb,
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
 
 
 def get_user_data_from_db():
@@ -111,16 +118,16 @@ def is_valid_fio(fio):
 
 
 def is_valid_phone(phonenumber):
-        try:
-            number = phonenumbers.parse(phonenumber, 'RU')
-            if phonenumbers.is_valid_number(number):
-                phone = phonenumbers.format_number(
-                    number,
-                    phonenumbers.PhoneNumberFormat.E164
-                )
-                return True
-        except NumberParseException:
-            return False
+    try:
+        number = phonenumbers.parse(phonenumber, 'RU')
+        if phonenumbers.is_valid_number(number):
+            phone = phonenumbers.format_number(
+                number,
+                phonenumbers.PhoneNumberFormat.E164
+            )
+            return True
+    except NumberParseException:
+        return False
 
 
 def is_valid_passport(passport):
@@ -222,13 +229,26 @@ def get_storage_period(update, context):
         return CHECK_PERIOD
     else:
         storage_info[user_id]['storage_period'] = storage_period
+        update.message.reply_text(
+            'Отлично! Теперь вы можете забронировать ячейку.',
+            reply_markup=reserve)
+        return RESERVE
+
+
+def reserve_cell(update, context):
+    message = update.message
+    storage_period = message.text
+
+    if storage_period == 'Зарезервировать':
         user_info = get_user_data_from_db()
-        ####Если есть пользователь в бд сразу на оплату
         if not user_info:
             update.message.reply_text(
                 'Пожалуйста, введите ваше ФИО, например - Иванов Иван Иванович',
             )
             return INITIALS
+        return CHECKOUT
+    else:
+        return start(update, context)
 
 
 def check_storage_period(update, context):
@@ -250,14 +270,10 @@ def check_storage_period(update, context):
         return PERIOD
     else:
         storage_info[user_id]['storage_period'] = user_message
-        user_info = get_user_data_from_db()
-        ####Если есть сразу на оплату
-        if not user_info:
-            update.message.reply_text(
-                'Пожалуйста, введите ваше ФИО, например - Иванов Иван Иванович',
-            )
-            return INITIALS
-        return ORDER
+        update.message.reply_text(
+            'Отлично! Теперь вы можете забронировать ячейку.',
+            reply_markup=reserve)
+        return RESERVE
 
 
 def get_initials(update, context):
@@ -387,6 +403,9 @@ class Command(BaseCommand):
                 CHECK_PERIOD: [CommandHandler('start', start),
                                MessageHandler(Filters.text,
                                               check_storage_period)],
+                RESERVE: [CommandHandler('start', start),
+                          MessageHandler(Filters.text,
+                                         reserve_cell)],
 
                 INITIALS: [CommandHandler('start', start),
                            MessageHandler(Filters.text, get_initials)],
