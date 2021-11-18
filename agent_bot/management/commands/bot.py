@@ -130,6 +130,10 @@ def is_valid_passport(passport):
 def is_valid_birth_date(birth_date):
     return True
 
+def is_valid_size(cell_size):
+    if cell_size.isdigit() and int(cell_size) < 100:
+        return True
+
 
 def get_qr_code(chat_id):
     img = qrcode.make(chat_id)
@@ -189,25 +193,22 @@ def get_things(update, context):
 def get_quantity(update, context):
     message = update.message
     user_id = message.chat_id
-    cell_size = message.text
-    if cell_size.isdigit() and int(cell_size) < 100:
-        context.user_data['quantity'] = cell_size
-        update.message.reply_text('Стоимость: 10000 за месяц')
-        storage_info[user_id]['cell_size'] = cell_size
-        time.sleep(0.3)
-        things = storage_info[user_id].get('things')
-        if things in ('лыжи', 'сноуборд', 'велосипед'):
-            reply_text = 'Выберете срок хранения.'
-            update.message.reply_text(reply_text, reply_markup=storage_period)
-            return PERIOD
-        if things == 'колеса':
-            reply_text = 'Выберете срок хранения.'
-            update.message.reply_text(
-                reply_text,
-                reply_markup=tires_storage_period
-            )
-            return PERIOD
-
+    cell_size = is_valid_size(message.text)
+    update.message.reply_text('Стоимость: 10000 за месяц')
+    storage_info[user_id]['cell_size'] = cell_size
+    time.sleep(0.3)
+    things = storage_info[user_id].get('things')
+    if things in ('лыжи', 'сноуборд', 'велосипед'):
+        reply_text = 'Выберете срок хранения.'
+        update.message.reply_text(reply_text, reply_markup=storage_period)
+        return PERIOD
+    if things == 'колеса':
+        reply_text = 'Выберете срок хранения.'
+        update.message.reply_text(
+            reply_text,
+            reply_markup=tires_storage_period
+        )
+        return PERIOD
     else:
         update.message.reply_text('Проверьте правильность ввода.')
 
@@ -235,7 +236,7 @@ def check_storage_period(update, context):
     message = update.message
     user_id = message.chat_id
     user_message = message.text
-    things = storage_info[user_id].get('things')
+    things = storage_info[user_id]['things']
 
     if things in ('лыжи', 'сноуборд', 'велосипед') and user_message == 'назад':
         reply_text = 'Выберете срок хранения.'
