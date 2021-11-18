@@ -3,6 +3,9 @@ import time
 import telegram
 import qrcode
 
+import phonenumbers
+from phonenumbers import NumberParseException
+
 from collections import defaultdict
 from django.core.management.base import BaseCommand
 from django.conf import settings
@@ -107,8 +110,17 @@ def is_valid_fio(fio):
     return True
 
 
-def is_valid_phone(phone):
-    return True
+def is_valid_phone(phonenumber):
+        try:
+            number = phonenumbers.parse(phonenumber, 'RU')
+            if phonenumbers.is_valid_number(number):
+                phone = phonenumbers.format_number(
+                    number,
+                    phonenumbers.PhoneNumberFormat.E164
+                )
+                return True
+        except NumberParseException:
+            return False
 
 
 def is_valid_passport(passport):
