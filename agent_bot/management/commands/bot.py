@@ -302,7 +302,7 @@ def get_other_storage_cell_size(update, context):
         update.message.reply_text('Принято.', reply_markup=more_storage_period)
         return SELECT_CELL_SIZE
     else:
-        storage_info[user_id]['storage_period'] = storage_period
+        storage_info[user_id]['storage_period'] = cell_size
         update.message.reply_text(
             'Отлично! Теперь вы можете забронировать ячейку.',
             reply_markup=reserve)
@@ -323,7 +323,7 @@ def get_select_storage_cell_size(update, context):
         print('принято')
         return SELECT_SIZE
     else:
-        storage_info[user_id]['storage_period'] = storage_period
+        storage_info[user_id]['storage_period'] = select
         update.message.reply_text(
             'Отлично! Теперь вы можете забронировать ячейку.',
             reply_markup=reserve)
@@ -524,7 +524,8 @@ def checkout(update, context):
         text='Для выхода в меню нажмите кнопку.'
         update.message.reply_text(text, reply_markup=menu)
         return MENU
-        #return start(update, context)
+    else:
+        return start(update, context)
 
 def get_menu(update, context):
     message = update.message
