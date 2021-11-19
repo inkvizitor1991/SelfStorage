@@ -4,3 +4,4 @@ python-dotenv==0.19.2
 python_telegram_bot==13.8.1
 telegram==0.0.1
 Pillow==8.4.0
+qrcode==7.3.1
