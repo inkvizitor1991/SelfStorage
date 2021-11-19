@@ -50,7 +50,7 @@ seasonal_things_kb = [
 ]
 storage_period_kb = [
     ['1 неделя', '1 месяц', '6 месяцев'],
-    ['Выбрать самостоятельно']
+    ['больше месяца но меньше пол года']
 ]
 more_storage_period_kb = [
     ['2 месяца', '3 месяца'],
@@ -111,7 +111,7 @@ reserve = ReplyKeyboardMarkup(
 
 
 def get_user_data_from_db():
-    return False
+    return True
 
 
 def is_valid_fio(fio):
@@ -278,6 +278,11 @@ def reserve_cell(update, context):
                 'Пожалуйста, введите ваше ФИО, например - Иванов Иван Иванович',
             )
             return INITIALS
+        else:
+            update.message.reply_text(
+                f'Отлично! Теперь можно приступить к оплате.',
+                reply_markup=byu_or_menu
+            )
         return CHECKOUT
     else:
         return start(update, context)
@@ -329,7 +334,7 @@ def get_user_passport_from_bot(update, context):
     phone = message.text
     if is_valid_phone(phone):
         update.message.reply_text(
-            'Пожалуйста, введите ваши пасспортные данные в формаете СЕРИЯ НОМЕР\n'
+            'Пожалуйста, введите ваши паспортные данные в формаете СЕРИЯ НОМЕР\n'
             'Например: 8805 777666',
         )
         storage_info[message.chat_id]['phone'] = phone
@@ -368,7 +373,7 @@ def create_order(update, context):
     phone = storage_info[message.chat_id]['phone']
     if is_valid_birth_date(birth_date):
         update.message.reply_text(
-            f'Отлично! Мы получили от вас следующие данные:\nФИО: {fio}\nПаспортные данные: {passport},\nТелефон: {phone},\nАдрес хранения: {address},\nТип хранения: {storage_type},\nВещь: {things},\nПериод хранения: {period}',
+            f'Отлично! Мы получили от вас следующие данные:\nФИО: {fio}\nПаспортные данные: {passport}\nТелефон: {phone}\nАдрес хранения: {address}\nТип хранения: {storage_type}\nВещь: {things}\nПериод хранения: {period}',
             reply_markup=byu_or_menu
         )
         return CHECKOUT
