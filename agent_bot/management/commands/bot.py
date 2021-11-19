@@ -50,7 +50,12 @@ seasonal_things_kb = [
 ]
 storage_period_kb = [
     ['1 неделя', '1 месяц', '6 месяцев'],
-    ['больше месяца но меньше пол года']
+    ['меньше месяца, но больше недели'],
+    ['больше месяца, но менее полугода']
+]
+less_month_storage_period_kb = [
+    ['2 недели', '3 недели'],
+    ['назад']
 ]
 more_storage_period_kb = [
     ['2 месяца', '3 месяца'],
@@ -58,8 +63,15 @@ more_storage_period_kb = [
     ['назад']
 ]
 tires_storage_period_kb = [
-    ['1 месяц', '6 месяцев'],
-    ['больше месяца но меньше пол года']
+    ['1 месяц', '6 месяцев', '12 месяцев'],
+    ['больше месяца, но менее полугода'],
+    ['больше 6 месяцев, но менее года']
+]
+more_6_months_storage_period_kb = [
+    ['7 месяцев', '8 месяцев'],
+    ['9 месяцев','10 месяцев'],
+    ['11 месяцев'],
+    ['назад']
 ]
 byu_or_menu_kb = [['Оплатить', 'Главное меню']]
 
@@ -102,7 +114,16 @@ more_storage_period = ReplyKeyboardMarkup(
     resize_keyboard=True,
     one_time_keyboard=True
 )
-
+more_6_months_storage_period = ReplyKeyboardMarkup(
+    more_6_months_storage_period_kb,
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
+less_month_storage_period = ReplyKeyboardMarkup(
+    less_month_storage_period_kb,
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
 tires_storage_period = ReplyKeyboardMarkup(
     tires_storage_period_kb,
     resize_keyboard=True,
@@ -266,7 +287,7 @@ def choose_category(update, context):
     storage_type = message.text
     storage_info[user_id]['storage_type'] = storage_type
     if storage_type == 'другое':
-        text = 'Выберите желаему площадь ячейки для хранения\n' \
+        text = 'Выберите желаемую площадь ячейки для хранения\n' \
                'Можно выбрать размер от 1 до 10 м2'
         update.message.reply_text(text, reply_markup=other_things)
         return CELL_SIZE
@@ -297,12 +318,17 @@ def select_storage_cell_size(update, context):
 def get_other_storage_cell_size(update, context):
     message = update.message
     user_id = message.chat_id
-    cell_size = message.text
-    if cell_size =='больше месяца но меньше пол года':
+    select = message.text
+    if select =='больше месяца, но менее полугода':
         update.message.reply_text('Принято.', reply_markup=more_storage_period)
         return SELECT_CELL_SIZE
+
+    if select == 'больше 6 месяцев, но менее года':
+        update.message.reply_text('Принято.', reply_markup=more_6_months_storage_period)
+        return SELECT_CELL_SIZE
+
     else:
-        storage_info[user_id]['storage_period'] = cell_size
+        storage_info[user_id]['storage_period'] = select
         update.message.reply_text(
             'Отлично! Теперь вы можете забронировать ячейку.',
             reply_markup=reserve)
@@ -369,9 +395,13 @@ def get_storage_period(update, context):
     user_id = message.chat_id
 
     storage_period = message.text
-    if storage_period == 'больше месяца но меньше пол года':
+    if storage_period == 'больше месяца, но менее полугода':
         update.message.reply_text('Принято.', reply_markup=more_storage_period)
         return CHECK_PERIOD
+    if storage_period == 'меньше месяца, но больше недели':
+        update.message.reply_text('Принято.', reply_markup=less_month_storage_period)
+        return CHECK_PERIOD
+
     else:
         storage_info[user_id]['storage_period'] = storage_period
         update.message.reply_text(
