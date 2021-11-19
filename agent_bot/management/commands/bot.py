@@ -25,8 +25,8 @@ logging.basicConfig(
     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-STORAGE, CATEGORY, THINGS, QUANTITY, PERIOD, CHECK_PERIOD, RESERVE, INITIALS, PASPORT, BIRTH, ORDER, CHECKOUT = range(
-    12)
+SELECTION, STORAGE, CATEGORY, THINGS, QUANTITY, PERIOD, CHECK_PERIOD, RESERVE, INITIALS, PASPORT, BIRTH, ORDER, CHECKOUT = range(
+    13)
 
 storage_info = defaultdict()
 
@@ -64,6 +64,10 @@ tires_storage_period_kb = [
 byu_or_menu_kb = [['Оплатить', 'Главное меню']]
 
 reserve_kb = [['Зарезервировать', 'Главное меню']]
+
+your_orders_kb = [['Мои ячейки', 'Создать новую ячейку']]
+
+main_kb = [['Создать новую ячейку']]
 
 address = ReplyKeyboardMarkup(
     address_kb,
@@ -108,10 +112,19 @@ reserve = ReplyKeyboardMarkup(
     resize_keyboard=True,
     one_time_keyboard=True
 )
-
+your_orders = ReplyKeyboardMarkup(
+    your_orders_kb,
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
+main = ReplyKeyboardMarkup(
+    main_kb,
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
 
 def get_user_data_from_db():
-    return True
+    return False
 
 
 def is_valid_fio(fio):
@@ -180,15 +193,44 @@ def start(update, context):
     time.sleep(0.5)
     message = update.message
     user_name = message.chat.first_name
-    text = f'Привет, {user_name}.🤚\n\n' \
-           'Я помогу вам арендовать личную ячейку для хранения вещей.' \
-           'Давайте посмотрим адреса складов, чтобы выбрать ближайший!'
-    update.message.reply_text(text)
-    time.sleep(1)
-    reply_text = 'Выберите склад, для хранения вещей.'
-    update.message.reply_text(reply_text, reply_markup=address)
-    time.sleep(0.2)
-    return STORAGE
+    user_info = get_user_data_from_db()
+    if not user_info:
+        text = f'Привет, {user_name}.🤚\n\n' \
+               'Я помогу вам арендовать личную ячейку для хранения вещей.' \
+               'Давайте посмотрим адреса складов, чтобы выбрать ближайший!'
+        update.message.reply_text(text)
+        time.sleep(1)
+        reply_text = 'Выберите склад, для хранения вещей.'
+        update.message.reply_text(reply_text, reply_markup=address)
+        time.sleep(0.2)
+        return STORAGE
+    else:
+        text = f'Привет, {user_name}.🤚\n\n' \
+               'Вы можете арендовать ячейку, либо посмотреть уже арендованные.'
+        update.message.reply_text(text)
+        time.sleep(1)
+        reply_text = 'Выберите следующее действие.'
+        update.message.reply_text(reply_text, reply_markup=your_orders)
+        time.sleep(0.2)
+        return SELECTION
+
+
+def get_selection_old_user(update, context):
+    message = update.message
+    selection = message.text
+    if selection =='Создать новую ячейку':
+        reply_text = 'Выберите склад, для хранения вещей.'
+        update.message.reply_text(reply_text, reply_markup=address)
+        time.sleep(0.2)
+        return STORAGE
+    else:
+        update.message.reply_text('Ваши заказы:')#############################
+        reply_text = 'Для создания новой ячейки нажмите кнопку.'
+        update.message.reply_text(reply_text, reply_markup=main)
+        time.sleep(0.2)
+
+
+
 
 
 def get_storage(update, context):
@@ -429,6 +471,10 @@ class Command(BaseCommand):
             entry_points=[CommandHandler('start', start)],
 
             states={
+
+                SELECTION: [CommandHandler('start', start),
+                          MessageHandler(Filters.text, get_selection_old_user)],
+
                 STORAGE: [CommandHandler('start', start),
                           MessageHandler(Filters.text, get_storage)],
 
