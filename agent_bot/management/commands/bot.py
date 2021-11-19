@@ -141,7 +141,7 @@ menu = ReplyKeyboardMarkup(
 )
 
 def get_user_data_from_db():
-    return True
+    return False
 
 
 def is_valid_fio(fio):
@@ -344,7 +344,6 @@ def get_quantity(update, context):
     user_id = message.chat_id
     cell_size = message.text
     if cell_size.isdigit() and int(cell_size) < 100:
-        context.user_data['quantity'] = cell_size
         update.message.reply_text('Стоимость: 10000 за месяц')
         storage_info[user_id]['cell_size'] = cell_size
         time.sleep(0.3)
@@ -481,11 +480,12 @@ def create_order(update, context):
     storage_period = storage_info[user_id]['storage_period']
     storage_type = storage_info[user_id]['storage_type']
     address = storage_info[user_id]['address']
-    things = storage_info[user_id]['things']
     period = storage_info[user_id]['storage_period']
     fio = storage_info[message.chat_id]['fio']
     passport = storage_info[message.chat_id]['passport']
     phone = storage_info[message.chat_id]['phone']
+    things = storage_info[user_id].get('things')
+
     if is_valid_birth_date(birth_date):
         update.message.reply_text(
             f'Отлично! Мы получили от вас следующие данные:\nФИО: {fio}\nПаспортные данные: {passport}\nТелефон: {phone}\nАдрес хранения: {address}\nТип хранения: {storage_type}\nВещь: {things}\nПериод хранения: {period}',
@@ -497,12 +497,25 @@ def create_order(update, context):
             'Дата рождения введена некорректно, нужный формат - ГОД-МЕСЯЦ-ЧИСЛО\n'
             'Например: 1991-08-17',
         )
-
+def get_things_price(period, cell_size, things_price):
+    amount, interval = period.split()
+    all_price = int(amount)*int(cell_size)*int(things_price)
+    return all_price
 
 def checkout(update, context):
     message = update.message
     choice = message.text
+    user_id = message.chat_id
     if choice == 'Оплатить':
+        storage_period = storage_info[user_id]['storage_period']
+        address = storage_info[user_id].get('address')
+        cell_size = storage_info[user_id].get('cell_size')
+        things = storage_info[user_id].get('things')
+        period = storage_info[user_id].get('storage_period')
+        things_price =100#тут цена за товар
+        if things:
+            all_price = get_things_price(period, cell_size, things_price)
+            print(all_price)
         update.message.reply_text(
             f'Ссылка на оплату {CHECKOUT_URL}'
         )
