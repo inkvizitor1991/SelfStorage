@@ -25,8 +25,8 @@ logging.basicConfig(
     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-SELECTION, STORAGE, CATEGORY, THINGS, QUANTITY, PERIOD, CHECK_PERIOD, RESERVE, INITIALS, PASPORT, BIRTH, ORDER, CHECKOUT = range(
-    13)
+SELECTION, STORAGE, CATEGORY, CELL_SIZE, SELECT_SIZE,SELECT_CELL_SIZE, THINGS, QUANTITY, PERIOD, CHECK_PERIOD, RESERVE, INITIALS, PASPORT, BIRTH, ORDER, CHECKOUT, MENU = range(
+    17)
 
 storage_info = defaultdict()
 
@@ -59,7 +59,7 @@ more_storage_period_kb = [
 ]
 tires_storage_period_kb = [
     ['1 месяц', '6 месяцев'],
-    ['Выбрать самостоятельно']
+    ['больше месяца но меньше пол года']
 ]
 byu_or_menu_kb = [['Оплатить', 'Главное меню']]
 
@@ -67,7 +67,14 @@ reserve_kb = [['Зарезервировать', 'Главное меню']]
 
 your_orders_kb = [['Мои ячейки', 'Создать новую ячейку']]
 
-main_kb = [['Создать новую ячейку']]
+new_order_kb = [['Создать новую ячейку']]
+
+other_things_kb = [
+    ['1', '2', '3', '4', '5'],
+    ['6', '7', '8', '9', '10']
+]
+
+menu_kb = [['Главное меню']]
 
 address = ReplyKeyboardMarkup(
     address_kb,
@@ -117,14 +124,24 @@ your_orders = ReplyKeyboardMarkup(
     resize_keyboard=True,
     one_time_keyboard=True
 )
-main = ReplyKeyboardMarkup(
-    main_kb,
+new_order = ReplyKeyboardMarkup(
+    new_order_kb,
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
+other_things = ReplyKeyboardMarkup(
+    other_things_kb,
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
+menu = ReplyKeyboardMarkup(
+    menu_kb,
     resize_keyboard=True,
     one_time_keyboard=True
 )
 
 def get_user_data_from_db():
-    return False
+    return True
 
 
 def is_valid_fio(fio):
@@ -218,19 +235,17 @@ def start(update, context):
 def get_selection_old_user(update, context):
     message = update.message
     selection = message.text
-    if selection =='Создать новую ячейку':
+    if selection == 'Создать новую ячейку':
         reply_text = 'Выберите склад, для хранения вещей.'
         update.message.reply_text(reply_text, reply_markup=address)
         time.sleep(0.2)
         return STORAGE
     else:
-        update.message.reply_text('Ваши заказы:')#############################
+        update.message.reply_text(
+            'Ваши заказы:')  #############################
         reply_text = 'Для создания новой ячейки нажмите кнопку.'
-        update.message.reply_text(reply_text, reply_markup=main)
+        update.message.reply_text(reply_text, reply_markup=new_order)
         time.sleep(0.2)
-
-
-
 
 
 def get_storage(update, context):
@@ -251,11 +266,68 @@ def choose_category(update, context):
     storage_type = message.text
     storage_info[user_id]['storage_type'] = storage_type
     if storage_type == 'другое':
-        print('ок')
+        text = 'Выберите желаему площадь ячейки для хранения\n' \
+               'Можно выбрать размер от 1 до 10 м2'
+        update.message.reply_text(text, reply_markup=other_things)
+        return CELL_SIZE
+
     if storage_type == 'сезонные вещи':
         reply_text = 'Выберете вещи.'
         update.message.reply_text(reply_text, reply_markup=seasonal_things)
         return THINGS
+
+
+def select_storage_cell_size(update, context):
+    message = update.message
+    user_id = message.chat_id
+    cell_size = int(message.text)
+    if cell_size in range(1, 11):
+        price = 599 + 150 * (cell_size - 1)
+        storage_info[user_id]['cell_size'] = cell_size
+        text = f'Стоимость хранения составит {price} рублей\n' \
+               f'Выберите срок хранения'
+        update.message.reply_text(
+            text,
+            reply_markup=tires_storage_period,
+        )
+        return SELECT_SIZE
+
+
+
+def get_other_storage_cell_size(update, context):
+    message = update.message
+    user_id = message.chat_id
+    cell_size = message.text
+    if cell_size =='больше месяца но меньше пол года':
+        update.message.reply_text('Принято.', reply_markup=more_storage_period)
+        return SELECT_CELL_SIZE
+    else:
+        storage_info[user_id]['storage_period'] = storage_period
+        update.message.reply_text(
+            'Отлично! Теперь вы можете забронировать ячейку.',
+            reply_markup=reserve)
+        return RESERVE
+
+
+
+def get_select_storage_cell_size(update, context):
+    message = update.message
+    user_id = message.chat_id
+    select = message.text
+    if select=='назад':
+        text='Принято.'
+        update.message.reply_text(
+            text,
+            reply_markup=tires_storage_period,
+        )
+        print('принято')
+        return SELECT_SIZE
+    else:
+        storage_info[user_id]['storage_period'] = storage_period
+        update.message.reply_text(
+            'Отлично! Теперь вы можете забронировать ячейку.',
+            reply_markup=reserve)
+        return RESERVE
 
 
 def get_things(update, context):
@@ -406,6 +478,7 @@ def create_order(update, context):
     message = update.message
     birth_date = message.text
     user_id = message.chat_id
+    storage_period = storage_info[user_id]['storage_period']
     storage_type = storage_info[user_id]['storage_type']
     address = storage_info[user_id]['address']
     things = storage_info[user_id]['things']
@@ -448,10 +521,16 @@ def checkout(update, context):
             'Вот ваш электронный ключ для доступа к вашему личному складу.'
             f'Вы сможете попасть на склад в любое время в период с {time_from.date()} по {time_to.date()}',
         )
-        return start(update, context)
-    else:
-        return start(update, context)
+        text='Для выхода в меню нажмите кнопку.'
+        update.message.reply_text(text, reply_markup=menu)
+        return MENU
+        #return start(update, context)
 
+def get_menu(update, context):
+    message = update.message
+    menu = message.text
+    if menu =='Главное меню':
+        return start(update, context)
 
 def cancel(update, _):
     user = update.message.from_user
@@ -473,13 +552,25 @@ class Command(BaseCommand):
             states={
 
                 SELECTION: [CommandHandler('start', start),
-                          MessageHandler(Filters.text, get_selection_old_user)],
+                            MessageHandler(Filters.text,
+                                           get_selection_old_user)],
 
                 STORAGE: [CommandHandler('start', start),
                           MessageHandler(Filters.text, get_storage)],
 
                 CATEGORY: [CommandHandler('start', start),
                            MessageHandler(Filters.text, choose_category)],
+
+                CELL_SIZE: [CommandHandler('start', start),
+                            MessageHandler(Filters.text,
+                                           select_storage_cell_size)],
+
+                SELECT_SIZE: [CommandHandler('start', start),
+                              MessageHandler(Filters.text,
+                                             get_other_storage_cell_size)],
+                SELECT_CELL_SIZE: [CommandHandler('start', start),
+                              MessageHandler(Filters.text,
+                                             get_select_storage_cell_size)],
 
                 THINGS: [CommandHandler('start', start),
                          MessageHandler(Filters.text, get_things)],
@@ -515,6 +606,9 @@ class Command(BaseCommand):
                 CHECKOUT: [CommandHandler('start', start),
                            MessageHandler(Filters.text,
                                           checkout)],
+                MENU: [CommandHandler('start', start),
+                           MessageHandler(Filters.text,
+                                          get_menu)],
 
             },
 
