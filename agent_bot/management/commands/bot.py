@@ -487,6 +487,8 @@ def create_order(update, context):
     things = storage_info[user_id].get('things')
 
     if is_valid_birth_date(birth_date):
+        if not things:
+            things = ''
         update.message.reply_text(
             f'Отлично! Мы получили от вас следующие данные:\nФИО: {fio}\nПаспортные данные: {passport}\nТелефон: {phone}\nАдрес хранения: {address}\nТип хранения: {storage_type}\nВещь: {things}\nПериод хранения: {period}',
             reply_markup=byu_or_menu
@@ -515,7 +517,6 @@ def checkout(update, context):
         things_price =100#тут цена за товар
         if things:
             all_price = get_things_price(period, cell_size, things_price)
-            print(all_price)
         update.message.reply_text(
             f'Ссылка на оплату {CHECKOUT_URL}'
         )
