@@ -1,5 +1,6 @@
 import logging
 import time
+from datetime import datetime, timedelta
 import telegram
 import qrcode
 
@@ -48,8 +49,8 @@ seasonal_things_kb = [
     ['велосипед', 'колеса']
 ]
 storage_period_kb = [
-    ['неделя', 'месяц', 'пол года'],
-    ['больше месяца но меньше пол года']
+    ['1 неделя', '1 месяц', '6 месяцев'],
+    ['Выбрать самостоятельно']
 ]
 more_storage_period_kb = [
     ['2 месяца', '3 месяца'],
@@ -57,8 +58,8 @@ more_storage_period_kb = [
     ['назад']
 ]
 tires_storage_period_kb = [
-    ['месяц', 'пол года'],
-    ['больше месяца но меньше пол года']
+    ['1 месяц', '6 месяцев'],
+    ['Выбрать самостоятельно']
 ]
 byu_or_menu_kb = [['Оплатить', 'Главное меню']]
 
@@ -114,7 +115,13 @@ def get_user_data_from_db():
 
 
 def is_valid_fio(fio):
-    return True
+    fio_splitted = fio.split()
+    if len(fio_splitted) != 3:
+        return False
+    elif all([fio_item.isalpha() for fio_item in fio_splitted]):
+        return True
+    else:
+        return False
 
 
 def is_valid_phone(phonenumber):
@@ -131,17 +138,42 @@ def is_valid_phone(phonenumber):
 
 
 def is_valid_passport(passport):
-    return True
+    passport_splitted = passport.split()
+    if len(passport_splitted) != 2:
+        return False
+    series, num = passport_splitted
+    if not all([series.isdigit(), num.isdigit()]):
+        return False
+    elif len(series) == 4 and len(num) == 6:
+        return True
+    else:
+        return False
 
 
 def is_valid_birth_date(birth_date):
-    return True
+    try:
+        datetime.strptime(birth_date, '%Y-%m-%d')
+        return True
+    except Exception:
+        return False
 
 
 def get_qr_code(chat_id):
     img = qrcode.make(chat_id)
     img.save(f'{chat_id}.png')
     return f'{chat_id}.png'
+
+
+def get_storage_interval_timedelta(period):
+    amount, interval = period.split()
+    if interval.startswith('н'):
+        days = 7 * int(amount)
+        delta = timedelta(days=days)
+        return delta
+    elif interval.startswith('м'):
+        days = 30 * int(amount)
+        delta = timedelta(days=days)
+        return delta
 
 
 def start(update, context):
@@ -362,6 +394,13 @@ def checkout(update, context):
                 photo=qr,
             )
         time.sleep(2)
+        period = storage_info[message.chat_id]['storage_period']
+        time_from = datetime.now()
+        time_to = time_from + get_storage_interval_timedelta(period)
+        update.message.reply_text(
+            'Вот ваш электронный ключ для доступа к вашему личному складу.'
+            f'Вы сможете попасть на склад в любое время в период с {time_from.date()} по {time_to.date()}',
+        )
         return start(update, context)
     else:
         return start(update, context)
