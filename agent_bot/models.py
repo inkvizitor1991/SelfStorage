@@ -1,44 +1,29 @@
 from django.db import models
 
 class Profile(models.Model):
-    external_id = models.PositiveIntegerField(
-        verbose_name='ID пользователя в сети',
-        unique=True
-    )
-    first_name = models.CharField(
-        'Имя пользователя',
-        blank=True,
-        max_length=10
-    )
-    patronymic = models.CharField(
-        'Отчество пользователя',
-        blank=True,
-        max_length=10
-    )
-    last_name = models.CharField(
-        'Фамилия пользователя',
+    full_name = models.CharField(
+        'ФИО пользователя',
         null=True,
         blank=True,
-        max_length=10
+        max_length=256
     )
     tg_chat_id = models.CharField(verbose_name='Chat ID Покупателя', null=True, blank=True,
                                         max_length=256)
     phone = models.CharField(
         'Телефон пользователя',
         blank=True,
-        max_length=20
+        max_length=20,
+        default='+'
     )
-    passport_date = models.IntegerField(
+    passport_date = models.CharField(
         'Пасспортные данные',
-        blank = True,
-        default=0
+        null=True, blank=True,
+        max_length=256
     )
-    birthdate = models.DateField(verbose_name='Дата рождения', null=True, blank=True)
-    home_address = models.CharField('Домашний адрес',
-                                    max_length=50, blank=True, default='')
+    birthdate = models.CharField(verbose_name='Дата рождения', null=True, blank=True, max_length=50)
 
     def __str__(self):
-        return f'{self.first_name}, {self.external_id}'
+        return f'{self.full_name}'
 
     class Meta:
         verbose_name = 'Профиль'
@@ -80,31 +65,14 @@ class Order(models.Model):
         auto_now_add=True
     )
     order_number = models.PositiveIntegerField('Номер заказа', null=True, default=None, unique=True)
-    customer_chat_id = models.CharField(verbose_name='Chat ID Покупателя', null=True, blank=True,
-                                        max_length=256)
     order_price = models.PositiveIntegerField(
         verbose_name='Цена заказа', default=0
     )
-    comments = models.CharField(verbose_name='Комментарии', null=True, blank=True,
-                                max_length=256)
-
-    class Meta:
-        ordering = ['created_at']
-        verbose_name = 'Заказы'
-        verbose_name_plural = 'Заказы'
-
-
-class OrderDetails(models.Model):
-    order = models.ForeignKey(
-        Order,
-        verbose_name='Заказ',
-        on_delete=models.CASCADE
-    )
-    cell_volume = models.PositiveIntegerField(verbose_name='Объем ячейки')
+    things = models.CharField(verbose_name='Вещи для храннения', max_length=256, default='')
     storage_address = models.CharField(verbose_name='Адрес ячейки', null=True, blank=True,
-                                       max_length=256)
-    start_date = models.DateField('Дата начала аренды')
-    end_date = models.DateField('Дата окончания аренды')
+                                       max_length=256, default='')
+    start_date = models.DateTimeField('Дата начала аренды', auto_now_add=True)
+    end_date = models.DateTimeField('Дата окончания аренды', auto_now_add=True)
     Available = 'Ячейка доступна'
     Unavailable = 'Ячейка недоступна'
     order_statuses = [
@@ -116,7 +84,14 @@ class OrderDetails(models.Model):
                                     choices=order_statuses,
                                     default=Available
                                     )
-    qr_code = models.ImageField(upload_to='static/qr', height_field=None, width_field=None, max_length=100)
+    qr_code = models.ImageField(upload_to='static/qr', height_field=None, width_field=None, max_length=100, default=None)
+    comments = models.CharField(verbose_name='Комментарии', null=True, blank=True,
+                                max_length=256, default='')
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'Заказы'
+        verbose_name_plural = 'Заказы'
 
 
 class Promo_code():

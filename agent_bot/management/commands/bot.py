@@ -10,6 +10,7 @@ from phonenumbers import NumberParseException
 from collections import defaultdict
 from django.core.management.base import BaseCommand
 from django.conf import settings
+from agent_bot.models import Profile, Stuff, Stuff_categories, Order, Promo_code
 
 from telegram import ReplyKeyboardMarkup
 from telegram.ext import (
@@ -161,9 +162,6 @@ menu = ReplyKeyboardMarkup(
     one_time_keyboard=True
 )
 
-def get_user_data_from_db():
-    return False
-
 
 def is_valid_fio(fio):
     fio_splitted = fio.split()
@@ -227,11 +225,34 @@ def get_storage_interval_timedelta(period):
         return delta
 
 
+def get_user_data_from_db(update):
+    try:
+        message = update.message
+        user_id = message.chat_id
+        existing_user = Profile.objects.get(tg_chat_id=user_id)
+        if existing_user:
+            return True
+    except:
+        return False
+
+
+def is_orders(update):
+    try:
+        message = update.message
+        user_id = message.chat_id
+        if {Order.objects.filter(profile__tg_chat_id__contains=user_id)}:
+            return your_orders
+        else:
+            return new_order
+    except:
+        return new_order
+
+
 def start(update, context):
     time.sleep(0.5)
     message = update.message
     user_name = message.chat.first_name
-    user_info = get_user_data_from_db()
+    user_info = get_user_data_from_db(update)
     if not user_info:
         text = f'Привет, {user_name}.🤚\n\n' \
                'Я помогу вам арендовать личную ячейку для хранения вещей.' \
@@ -248,7 +269,8 @@ def start(update, context):
         update.message.reply_text(text)
         time.sleep(1)
         reply_text = 'Выберите следующее действие.'
-        update.message.reply_text(reply_text, reply_markup=your_orders)
+        actual_buttons = is_orders(update)
+        update.message.reply_text(reply_text, reply_markup=actual_buttons)
         time.sleep(0.2)
         return SELECTION
 
@@ -256,14 +278,19 @@ def start(update, context):
 def get_selection_old_user(update, context):
     message = update.message
     selection = message.text
+    user_id = message.chat_id
     if selection == 'Создать новую ячейку':
         reply_text = 'Выберите склад, для хранения вещей.'
         update.message.reply_text(reply_text, reply_markup=address)
         time.sleep(0.2)
         return STORAGE
     else:
+        user_orders = Order.objects.filter(profile__tg_chat_id__contains=user_id)
+        orders_info = []
+        for order in user_orders:
+            orders_info.append(f'Номер заказа {order.order_number}, хранение {order.things} c {order.start_date} по {order.end_date} по адресу {order.storage_address}')
         update.message.reply_text(
-            'Ваши заказы:')  #############################
+            f'Ваши заказы:\n {orders_info}')
         reply_text = 'Для создания новой ячейки нажмите кнопку.'
         update.message.reply_text(reply_text, reply_markup=new_order)
         time.sleep(0.2)
@@ -368,18 +395,19 @@ def get_things(update, context):
 def get_quantity(update, context):
     message = update.message
     user_id = message.chat_id
-    cell_size = message.text
-    if cell_size.isdigit() and int(cell_size) < 100:
-        update.message.reply_text('Стоимость: 10000 за месяц')
-        storage_info[user_id]['cell_size'] = cell_size
+    number_things = message.text
+    if number_things.isdigit() and int(number_things) < 100:
+        storage_info[user_id]['number_things'] = number_things
         time.sleep(0.3)
         things = storage_info[user_id].get('things')
+        price_per_week = Stuff.objects.get(stuff_name=things).price_per_week
+        price_per_month = Stuff.objects.get(stuff_name=things).price_per_month
         if things in ('лыжи', 'сноуборд', 'велосипед'):
-            reply_text = 'Выберете срок хранения.'
+            reply_text = f'Выберете срок хранения {things}.\n Стоимость хранения {number_things} ед. в неделю {price_per_week*int(number_things)}, в месяц {price_per_month*int(number_things)}.'
             update.message.reply_text(reply_text, reply_markup=storage_period)
             return PERIOD
         if things == 'колеса':
-            reply_text = 'Выберете срок хранения.'
+            reply_text = f'Выберете срок хранения {things}.\n Стоимость хранения {number_things} ед. в месяц {price_per_month*int(number_things)}.'
             update.message.reply_text(
                 reply_text,
                 reply_markup=tires_storage_period
@@ -393,7 +421,6 @@ def get_quantity(update, context):
 def get_storage_period(update, context):
     message = update.message
     user_id = message.chat_id
-
     storage_period = message.text
     if storage_period == 'больше месяца, но менее полугода':
         update.message.reply_text('Принято.', reply_markup=more_storage_period)
@@ -415,7 +442,7 @@ def reserve_cell(update, context):
     storage_period = message.text
 
     if storage_period == 'Зарезервировать':
-        user_info = get_user_data_from_db()
+        user_info = get_user_data_from_db(update)
         if not user_info:
             update.message.reply_text(
                 'Пожалуйста, введите ваше ФИО, например - Иванов Иван Иванович',
@@ -502,12 +529,22 @@ def get_user_birth_date_from_bot(update, context):
             'Паспортные данные введены некорректно, нужный формат - СЕРИЯ НОМЕР',
         )
 
+def save_user_to_db(update, context):
+    message = update.message
+    user_id = message.chat_id
+    user, _ = Profile.objects.get_or_create(tg_chat_id=user_id)
+    user.full_name = storage_info[user_id].get('fio')
+    user.tg_chat_id = user_id
+    user.phone = storage_info[user_id].get('phone')
+    user.passport_date = storage_info[user_id].get('passport')
+    user.birthdate =  storage_info[user_id].get('birth_date')
+    user.save()
+
 
 def create_order(update, context):
     message = update.message
     birth_date = message.text
     user_id = message.chat_id
-    storage_period = storage_info[user_id]['storage_period']
     storage_type = storage_info[user_id]['storage_type']
     address = storage_info[user_id]['address']
     period = storage_info[user_id]['storage_period']
@@ -515,8 +552,8 @@ def create_order(update, context):
     passport = storage_info[message.chat_id]['passport']
     phone = storage_info[message.chat_id]['phone']
     things = storage_info[user_id].get('things')
-
     if is_valid_birth_date(birth_date):
+        storage_info[user_id]['birth_date'] = birth_date
         if not things:
             things = ''
         update.message.reply_text(
@@ -529,10 +566,47 @@ def create_order(update, context):
             'Дата рождения введена некорректно, нужный формат - ГОД-МЕСЯЦ-ЧИСЛО\n'
             'Например: 1991-08-17',
         )
-def get_things_price(period, cell_size, things_price):
+def get_things_price(period, number_things, things_weekly_price, things_monthly_price):
     amount, interval = period.split()
-    all_price = int(amount)*int(cell_size)*int(things_price)
-    return all_price
+    if interval.startswith('н'):
+        all_price = int(amount) * int(number_things) * int(things_weekly_price)
+        return all_price
+    else:
+        all_price = int(amount) * int(number_things) * int(things_monthly_price)
+        return all_price
+
+def save_order_to_db(update, context, qr_code_path, time_from, time_to, all_price):
+    message = update.message
+    user_id = message.chat_id
+    address = storage_info[user_id]['address']
+    things = storage_info[user_id].get('things')
+    try:
+        order_number = Order.objects.latest('order_number').order_number + 1
+    except Order.DoesNotExist:
+        order_number = 1
+    if things:
+        order = Order.objects.create(
+            order_number=order_number,
+            profile = Profile.objects.get(tg_chat_id=user_id),
+            order_price=all_price,
+            start_date = time_from,
+            end_date = time_to,
+            things = things,
+            storage_address =  address,
+            qr_code = qr_code_path,
+        )
+        order.save
+    else:
+        order = Order.objects.create(
+            order_number=order_number,
+            profile=Profile.objects.get(tg_chat_id=user_id),
+            order_price=1000,
+            start_date=time_from,
+            end_date=time_to,
+            storage_address=address,
+            qr_code=qr_code_path,
+        )
+        order.save
 
 def checkout(update, context):
     message = update.message
@@ -541,12 +615,13 @@ def checkout(update, context):
     if choice == 'Оплатить':
         storage_period = storage_info[user_id]['storage_period']
         address = storage_info[user_id].get('address')
-        cell_size = storage_info[user_id].get('cell_size')
+        number_things = storage_info[user_id].get('number_things')
         things = storage_info[user_id].get('things')
         period = storage_info[user_id].get('storage_period')
-        things_price =100#тут цена за товар
         if things:
-            all_price = get_things_price(period, cell_size, things_price)
+            things_weekly_price = Stuff.objects.get(stuff_name=things).price_per_week
+            things_monthly_price = Stuff.objects.get(stuff_name=things).price_per_month
+            all_price = get_things_price(period, number_things, things_weekly_price, things_monthly_price)
         update.message.reply_text(
             f'Ссылка на оплату {CHECKOUT_URL}'
         )
@@ -561,6 +636,11 @@ def checkout(update, context):
         period = storage_info[message.chat_id]['storage_period']
         time_from = datetime.now()
         time_to = time_from + get_storage_interval_timedelta(period)
+        if get_user_data_from_db(update):
+            save_order_to_db(update, context, qr_code_path, time_from, time_to, all_price)
+        else:
+            save_user_to_db(update, context)
+            save_order_to_db(update, context, qr_code_path, time_from, time_to, all_price)
         update.message.reply_text(
             'Вот ваш электронный ключ для доступа к вашему личному складу.'
             f'Вы сможете попасть на склад в любое время в период с {time_from.date()} по {time_to.date()}',
