@@ -26,8 +26,8 @@ logging.basicConfig(
     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-SELECTION, STORAGE, CATEGORY, CELL_SIZE, SELECT_SIZE,SELECT_CELL_SIZE, THINGS, QUANTITY, PERIOD, CHECK_PERIOD, RESERVE, INITIALS, PASPORT, BIRTH, ORDER, CHECKOUT, MENU = range(
-    17)
+SELECTION, STORAGE, CATEGORY, CELL_SIZE, SELECT_SIZE, SELECT_CELL_SIZE, THINGS, QUANTITY, PERIOD, CHECK_PERIOD, RESERVE, INITIALS, PASPORT, BIRTH, INPUT_PROMO, CHECK_PROMO, GET_PROMO, ORDER, CHECKOUT, MENU = range(
+    20)
 
 storage_info = defaultdict()
 
@@ -74,6 +74,7 @@ more_6_months_storage_period_kb = [
     ['11 месяцев'],
     ['назад']
 ]
+input_promo_code_kb = [['Ввести промокод', 'Перейти к оплате']]
 byu_or_menu_kb = [['Оплатить', 'Главное меню']]
 
 reserve_kb = [['Зарезервировать', 'Главное меню']]
@@ -91,6 +92,12 @@ menu_kb = [['Главное меню']]
 
 address = ReplyKeyboardMarkup(
     address_kb,
+    resize_keyboard=True,
+    one_time_keyboard=True
+)
+
+promo_code = ReplyKeyboardMarkup(
+    input_promo_code_kb,
     resize_keyboard=True,
     one_time_keyboard=True
 )
@@ -226,14 +233,11 @@ def get_storage_interval_timedelta(period):
 
 
 def get_user_data_from_db(update):
-    try:
-        message = update.message
-        user_id = message.chat_id
-        existing_user = Profile.objects.get(tg_chat_id=user_id)
-        if existing_user:
-            return True
-    except:
-        return False
+    message = update.message
+    user_id = message.chat_id
+
+    existing_user = Profile.objects.filter(tg_chat_id=user_id)
+    return existing_user
 
 
 def is_orders(update):
@@ -341,7 +345,6 @@ def select_storage_cell_size(update, context):
         return SELECT_SIZE
 
 
-
 def get_other_storage_cell_size(update, context):
     message = update.message
     user_id = message.chat_id
@@ -362,13 +365,12 @@ def get_other_storage_cell_size(update, context):
         return RESERVE
 
 
-
 def get_select_storage_cell_size(update, context):
     message = update.message
     user_id = message.chat_id
     select = message.text
-    if select=='назад':
-        text='Принято.'
+    if select == 'назад':
+        text = 'Принято.'
         update.message.reply_text(
             text,
             reply_markup=tires_storage_period,
@@ -523,11 +525,12 @@ def get_user_birth_date_from_bot(update, context):
             'Пожалуйста, введите вашу дату рождения в формете ГОД-МЕСЯЦ-ЧИСЛО\n'
         )
         storage_info[message.chat_id]['passport'] = passport
-        return ORDER
+        return INPUT_PROMO
     else:
         update.message.reply_text(
             'Паспортные данные введены некорректно, нужный формат - СЕРИЯ НОМЕР',
         )
+
 
 def save_user_to_db(update, context):
     message = update.message
@@ -541,6 +544,47 @@ def save_user_to_db(update, context):
     user.save()
 
 
+def input_promo_code(update):
+    message = update.message
+    user_id = message.chat_id
+    birth_date = message.text
+
+    if is_valid_birth_date(birth_date):
+        storage_info[user_id]['birth_date'] = birth_date
+        update.message.reply_text(
+            'Есть ли у вас промокод на получение скидки?',
+            reply_markup=promo_code
+        )
+        return CHECK_PROMO
+    else:
+        update.message.reply_text(
+            'Дата рождения введена некорректно, нужный формат - ГОД-МЕСЯЦ-ЧИСЛО\n'
+            'Например: 1991-08-17',
+        )
+
+
+def check_promo_code(update):
+    message = update.message
+    user_id = message.chat_id
+    choice = message.text
+
+    if choice == 'Ввести промокод':
+        update.message.reply_text(
+            'Отлично! Введите ваш промокод',
+        )
+        return GET_PROMO
+    else:
+        return ORDER
+
+
+def get_promo_code(update):
+    message = update.message
+    user_id = message.chat_id
+    promo_code = message.text
+    storage_info[user_id]['promo_code'] = promo_code
+    return ORDER
+
+
 def create_order(update, context):
     message = update.message
     birth_date = message.text
@@ -552,20 +596,15 @@ def create_order(update, context):
     passport = storage_info[message.chat_id]['passport']
     phone = storage_info[message.chat_id]['phone']
     things = storage_info[user_id].get('things')
-    if is_valid_birth_date(birth_date):
-        storage_info[user_id]['birth_date'] = birth_date
-        if not things:
-            things = ''
-        update.message.reply_text(
-            f'Отлично! Мы получили от вас следующие данные:\nФИО: {fio}\nПаспортные данные: {passport}\nТелефон: {phone}\nАдрес хранения: {address}\nТип хранения: {storage_type}\nВещь: {things}\nПериод хранения: {period}',
-            reply_markup=byu_or_menu
-        )
-        return CHECKOUT
-    else:
-        update.message.reply_text(
-            'Дата рождения введена некорректно, нужный формат - ГОД-МЕСЯЦ-ЧИСЛО\n'
-            'Например: 1991-08-17',
-        )
+    if not things:
+        things = ''
+    update.message.reply_text(
+        f'Отлично! Мы получили от вас следующие данные:\nФИО: {fio}\nПаспортные данные: {passport}\nТелефон: {phone}\nАдрес хранения: {address}\nТип хранения: {storage_type}\nВещь: {things}\nПериод хранения: {period}',
+        reply_markup=byu_or_menu
+    )
+    return CHECKOUT
+
+
 def get_things_price(period, number_things, things_weekly_price, things_monthly_price):
     amount, interval = period.split()
     if interval.startswith('н'):
@@ -574,6 +613,7 @@ def get_things_price(period, number_things, things_weekly_price, things_monthly_
     else:
         all_price = int(amount) * int(number_things) * int(things_monthly_price)
         return all_price
+
 
 def save_order_to_db(update, context, qr_code_path, time_from, time_to, all_price):
     message = update.message
@@ -607,6 +647,7 @@ def save_order_to_db(update, context, qr_code_path, time_from, time_to, all_pric
             qr_code=qr_code_path,
         )
         order.save
+
 
 def checkout(update, context):
     message = update.message
@@ -651,11 +692,13 @@ def checkout(update, context):
     else:
         return start(update, context)
 
+
 def get_menu(update, context):
     message = update.message
     menu = message.text
     if menu =='Главное меню':
         return start(update, context)
+
 
 def cancel(update, _):
     user = update.message.from_user
@@ -723,6 +766,16 @@ class Command(BaseCommand):
                 BIRTH: [CommandHandler('start', start),
                         MessageHandler(Filters.text,
                                        get_user_birth_date_from_bot)],
+
+                INPUT_PROMO: [CommandHandler('start', start),
+                        MessageHandler(Filters.text,
+                                       input_promo_code)],
+                CHECK_PROMO: [CommandHandler('start', start),
+                              MessageHandler(Filters.text,
+                                             check_promo_code)],
+                CHECK_PROMO: [CommandHandler('start', start),
+                              MessageHandler(Filters.text,
+                                             get_promo_code)],
 
                 ORDER: [CommandHandler('start', start),
                         MessageHandler(Filters.text,
